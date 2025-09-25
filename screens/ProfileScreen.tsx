@@ -12,6 +12,7 @@ import { commonStyles, colors, spacing, borderRadius, shadows } from '../styles/
 import Icon from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import SimpleBottomSheet from '../components/BottomSheet';
+import SettingsScreen from './SettingsScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -84,6 +85,7 @@ const recentActivity = [
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<'owned' | 'activity'>('owned');
   const [showWalletSheet, setShowWalletSheet] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   console.log('ProfileScreen rendered');
 
@@ -176,6 +178,12 @@ export default function ProfileScreen() {
     </View>
   );
 
+  if (showSettings) {
+    return (
+      <SettingsScreen onBack={() => setShowSettings(false)} />
+    );
+  }
+
   return (
     <ScrollView style={commonStyles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
@@ -192,7 +200,10 @@ export default function ProfileScreen() {
             alignItems: 'center',
             justifyContent: 'center',
           }}
-          onPress={() => console.log('Settings pressed')}
+          onPress={() => {
+            console.log('Settings pressed');
+            setShowSettings(true);
+          }}
         >
           <Icon name="settings" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -294,6 +305,53 @@ export default function ProfileScreen() {
             </Text>
           </LinearGradient>
         </TouchableOpacity>
+      </View>
+
+      {/* Quick Actions */}
+      <View style={[commonStyles.px_md, commonStyles.mb_lg]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <TouchableOpacity
+            style={[
+              commonStyles.card,
+              {
+                flex: 1,
+                marginRight: spacing.sm,
+                alignItems: 'center',
+                paddingVertical: spacing.md,
+              }
+            ]}
+            onPress={() => {
+              console.log('Connect wallet pressed');
+              setShowSettings(true);
+            }}
+          >
+            <Icon name="wallet" size={24} color={colors.primary} style={{ marginBottom: spacing.xs }} />
+            <Text style={[commonStyles.text, { fontSize: 12, fontWeight: '600' }]}>
+              Connect Wallet
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              commonStyles.card,
+              {
+                flex: 1,
+                marginLeft: spacing.sm,
+                alignItems: 'center',
+                paddingVertical: spacing.md,
+              }
+            ]}
+            onPress={() => {
+              console.log('Email notifications pressed');
+              setShowSettings(true);
+            }}
+          >
+            <Icon name="mail" size={24} color={colors.accent} style={{ marginBottom: spacing.xs }} />
+            <Text style={[commonStyles.text, { fontSize: 12, fontWeight: '600' }]}>
+              Email Alerts
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Tabs */}

@@ -93,3 +93,36 @@ export interface Auction {
   status: 'active' | 'ended' | 'cancelled';
   bids: Bid[];
 }
+
+export interface WalletInfo {
+  address: string;
+  balance: string;
+  network: string;
+  provider: string;
+  connected: boolean;
+  connectedAt: string;
+}
+
+export interface NotificationPreferences {
+  newArtworks: boolean;
+  priceAlerts: boolean;
+  auctionUpdates: boolean;
+  marketingEmails: boolean;
+  weeklyDigest: boolean;
+}
+
+export interface EmailSubscription {
+  email: string;
+  preferences: NotificationPreferences;
+  subscribedAt: string;
+  verified: boolean;
+}
+
+export interface WalletProvider {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  description: string;
+  supported: boolean;
+}
