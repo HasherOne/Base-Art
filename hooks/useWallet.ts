@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAsyncStorage } from './useAsyncStorage';
 import { WalletInfo } from '../types';
+import { walletService } from '../services/walletService';
 
 export function useWallet() {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -15,31 +16,52 @@ export function useWallet() {
 
   console.log('useWallet hook - wallet info:', walletInfo);
 
+  // Initialize wallet service with stored wallet info
+  useEffect(() => {
+    if (walletInfo && walletInfo.connected) {
+      console.log('Restoring wallet connection from storage');
+      // In a real app, you might want to verify the connection is still valid
+    }
+  }, [walletInfo]);
+
   const connectWallet = async (providerId: string): Promise<WalletInfo | null> => {
     console.log('Connecting wallet with provider:', providerId);
     setIsConnecting(true);
     setConnectionError(null);
 
     try {
-      // Simulate wallet connection process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      let result: WalletInfo | null = null;
 
-      // Mock successful connection
-      const mockWalletInfo: WalletInfo = {
-        address: `0x${Math.random().toString(16).substr(2, 40)}`,
-        balance: (Math.random() * 10 + 1).toFixed(2) + ' ETH',
-        network: 'Base Mainnet',
-        provider: getProviderName(providerId),
-        connected: true,
-        connectedAt: new Date().toISOString(),
-      };
+      switch (providerId) {
+        case 'metamask':
+          result = await walletService.connectMetaMask();
+          break;
+        case 'coinbase':
+          result = await walletService.connectCoinbaseWallet();
+          break;
+        case 'walletconnect':
+          result = await walletService.connectWalletConnect();
+          break;
+        default:
+          throw new Error(`Unsupported wallet provider: ${providerId}`);
+      }
 
-      await setWalletInfo(mockWalletInfo);
-      console.log('Wallet connected successfully:', mockWalletInfo);
-      return mockWalletInfo;
+      if (result) {
+        await setWalletInfo(result);
+        console.log('Wallet connected successfully:', result);
+        
+        // Ensure we're on the Base network
+        const networkSwitched = await walletService.switchToBaseNetwork();
+        if (!networkSwitched) {
+          console.warn('Failed to switch to Base network');
+        }
+      }
+
+      return result;
     } catch (error) {
       console.error('Wallet connection failed:', error);
-      setConnectionError('Failed to connect wallet. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to connect wallet. Please try again.';
+      setConnectionError(errorMessage);
       return null;
     } finally {
       setIsConnecting(false);
@@ -49,6 +71,7 @@ export function useWallet() {
   const disconnectWallet = async (): Promise<void> => {
     console.log('Disconnecting wallet');
     try {
+      walletService.disconnect();
       await setWalletInfo(null);
       setConnectionError(null);
       console.log('Wallet disconnected successfully');
@@ -59,23 +82,85 @@ export function useWallet() {
   };
 
   const refreshBalance = async (): Promise<void> => {
-    if (!walletInfo) return;
+    if (!walletInfo || !walletInfo.address) {
+      console.log('No wallet connected, cannot refresh balance');
+      return;
+    }
 
     console.log('Refreshing wallet balance');
     try {
-      // Simulate balance refresh
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const newBalance = await walletService.refreshBalance(walletInfo.address);
       
       const updatedWalletInfo: WalletInfo = {
         ...walletInfo,
-        balance: (Math.random() * 10 + 1).toFixed(2) + ' ETH',
+        balance: newBalance,
       };
 
       await setWalletInfo(updatedWalletInfo);
-      console.log('Balance refreshed:', updatedWalletInfo.balance);
+      console.log('Balance refreshed:', newBalance);
     } catch (error) {
       console.error('Failed to refresh balance:', error);
       setConnectionError('Failed to refresh balance.');
+    }
+  };
+
+  const signMessage = async (message: string): Promise<string | null> => {
+    if (!walletInfo) {
+      setConnectionError('No wallet connected');
+      return null;
+    }
+
+    try {
+      const signature = await walletService.signMessage(message);
+      console.log('Message signed successfully');
+      return signature;
+    } catch (error) {
+      console.error('Failed to sign message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign message';
+      setConnectionError(errorMessage);
+      return null;
+    }
+  };
+
+  const sendTransaction = async (to: string, value: string): Promise<string | null> => {
+    if (!walletInfo) {
+      setConnectionError('No wallet connected');
+      return null;
+    }
+
+    try {
+      const txHash = await walletService.sendTransaction(to, value);
+      console.log('Transaction sent successfully:', txHash);
+      
+      // Refresh balance after transaction
+      setTimeout(() => {
+        refreshBalance();
+      }, 2000);
+      
+      return txHash;
+    } catch (error) {
+      console.error('Failed to send transaction:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send transaction';
+      setConnectionError(errorMessage);
+      return null;
+    }
+  };
+
+  const switchNetwork = async (): Promise<boolean> => {
+    try {
+      const success = await walletService.switchToBaseNetwork();
+      if (success && walletInfo) {
+        const updatedWalletInfo: WalletInfo = {
+          ...walletInfo,
+          network: 'Base',
+          chainId: 8453,
+        };
+        await setWalletInfo(updatedWalletInfo);
+      }
+      return success;
+    } catch (error) {
+      console.error('Failed to switch network:', error);
+      return false;
     }
   };
 
@@ -90,6 +175,9 @@ export function useWallet() {
     connectWallet,
     disconnectWallet,
     refreshBalance,
+    signMessage,
+    sendTransaction,
+    switchNetwork,
   };
 }
 

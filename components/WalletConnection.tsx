@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   Alert,
   StyleSheet,
+  TextInput,
+  ScrollView,
 } from 'react-native';
 import { colors, spacing, borderRadius, shadows } from '../styles/commonStyles';
 import Icon from './Icon';
@@ -20,15 +22,15 @@ const SUPPORTED_WALLETS = [
     id: 'metamask',
     name: 'MetaMask',
     icon: 'wallet',
-    color: colors.primary,
-    description: 'Connect using MetaMask browser extension',
+    color: '#F6851B',
+    description: 'Connect using MetaMask mobile app',
   },
   {
     id: 'coinbase',
     name: 'Coinbase Wallet',
     icon: 'card',
     color: '#0052FF',
-    description: 'Connect using Coinbase Wallet',
+    description: 'Connect using Coinbase Wallet app',
   },
   {
     id: 'walletconnect',
@@ -41,6 +43,11 @@ const SUPPORTED_WALLETS = [
 
 export default function WalletConnection({ onWalletConnected }: WalletConnectionProps) {
   const [connectingWallet, setConnectingWallet] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [messageToSign, setMessageToSign] = useState('');
+  const [transactionTo, setTransactionTo] = useState('');
+  const [transactionValue, setTransactionValue] = useState('');
+  
   const {
     walletInfo,
     isConnected,
@@ -49,6 +56,9 @@ export default function WalletConnection({ onWalletConnected }: WalletConnection
     connectWallet,
     disconnectWallet,
     refreshBalance,
+    signMessage,
+    sendTransaction,
+    switchNetwork,
   } = useWallet();
 
   console.log('WalletConnection rendered, connected:', isConnected, 'wallet:', walletInfo);
@@ -62,16 +72,16 @@ export default function WalletConnection({ onWalletConnected }: WalletConnection
       if (result) {
         onWalletConnected?.(result);
         Alert.alert(
-          'Wallet Connected!',
-          `Successfully connected to ${result.provider}`,
-          [{ text: 'OK' }]
+          'Wallet Connected! 🎉',
+          `Successfully connected to ${result.provider}\n\nAddress: ${result.address.slice(0, 6)}...${result.address.slice(-4)}\nNetwork: ${result.network}`,
+          [{ text: 'Great!' }]
         );
       }
     } catch (error) {
       console.error('Wallet connection error:', error);
       Alert.alert(
         'Connection Failed',
-        connectionError || 'Failed to connect to wallet. Please try again.',
+        connectionError || 'Failed to connect to wallet. Please ensure the wallet app is installed and try again.',
         [{ text: 'OK' }]
       );
     } finally {
@@ -83,7 +93,7 @@ export default function WalletConnection({ onWalletConnected }: WalletConnection
     console.log('Disconnecting wallet');
     Alert.alert(
       'Disconnect Wallet',
-      'Are you sure you want to disconnect your wallet?',
+      'Are you sure you want to disconnect your wallet? You will need to reconnect to use the app.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -105,6 +115,77 @@ export default function WalletConnection({ onWalletConnected }: WalletConnection
   const handleRefreshBalance = async () => {
     console.log('Refreshing balance');
     await refreshBalance();
+    Alert.alert(
+      'Balance Updated',
+      'Your wallet balance has been refreshed.',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleSignMessage = async () => {
+    if (!messageToSign.trim()) {
+      Alert.alert('Error', 'Please enter a message to sign');
+      return;
+    }
+
+    try {
+      const signature = await signMessage(messageToSign);
+      if (signature) {
+        Alert.alert(
+          'Message Signed',
+          `Message: "${messageToSign}"\n\nSignature: ${signature.slice(0, 20)}...`,
+          [{ text: 'OK' }]
+        );
+        setMessageToSign('');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to sign message');
+    }
+  };
+
+  const handleSendTransaction = async () => {
+    if (!transactionTo.trim() || !transactionValue.trim()) {
+      Alert.alert('Error', 'Please enter both recipient address and amount');
+      return;
+    }
+
+    Alert.alert(
+      'Confirm Transaction',
+      `Send ${transactionValue} ETH to ${transactionTo.slice(0, 6)}...${transactionTo.slice(-4)}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send',
+          onPress: async () => {
+            try {
+              const txHash = await sendTransaction(transactionTo, transactionValue);
+              if (txHash) {
+                Alert.alert(
+                  'Transaction Sent',
+                  `Transaction Hash: ${txHash.slice(0, 20)}...\n\nYou can view it on the Base explorer.`,
+                  [{ text: 'OK' }]
+                );
+                setTransactionTo('');
+                setTransactionValue('');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to send transaction');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleSwitchNetwork = async () => {
+    const success = await switchNetwork();
+    Alert.alert(
+      success ? 'Network Switched' : 'Switch Failed',
+      success 
+        ? 'Successfully switched to Base network'
+        : 'Failed to switch network. Please try manually in your wallet.',
+      [{ text: 'OK' }]
+    );
   };
 
   const openWalletInfo = async () => {
@@ -113,9 +194,10 @@ export default function WalletConnection({ onWalletConnected }: WalletConnection
     console.log('Opening wallet info');
     Alert.alert(
       'Wallet Information',
-      `Address: ${walletInfo.address}\nBalance: ${walletInfo.balance}\nNetwork: ${walletInfo.network}`,
+      `Provider: ${walletInfo.provider}\nAddress: ${walletInfo.address}\nBalance: ${walletInfo.balance}\nNetwork: ${walletInfo.network}\nChain ID: ${walletInfo.chainId}`,
       [
         { text: 'Refresh Balance', onPress: handleRefreshBalance },
+        { text: 'Switch to Base', onPress: handleSwitchNetwork },
         { text: 'Disconnect', style: 'destructive', onPress: handleDisconnectWallet },
         { text: 'Close', style: 'cancel' }
       ]
@@ -124,7 +206,7 @@ export default function WalletConnection({ onWalletConnected }: WalletConnection
 
   if (isConnected && walletInfo) {
     return (
-      <View style={styles.container}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Connected Wallet</Text>
         
         <TouchableOpacity style={styles.connectedWallet} onPress={openWalletInfo}>
@@ -137,6 +219,9 @@ export default function WalletConnection({ onWalletConnected }: WalletConnection
               <Text style={styles.walletAddress}>
                 {walletInfo.address.slice(0, 6)}...{walletInfo.address.slice(-4)}
               </Text>
+              {walletInfo.ensName && (
+                <Text style={styles.ensName}>{walletInfo.ensName}</Text>
+              )}
             </View>
             <View style={styles.walletBalance}>
               <Text style={styles.balanceText}>{walletInfo.balance}</Text>
@@ -155,29 +240,97 @@ export default function WalletConnection({ onWalletConnected }: WalletConnection
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.actionButton, styles.disconnectButton]}
-            onPress={handleDisconnectWallet}
+            style={[styles.actionButton, styles.networkButton]}
+            onPress={handleSwitchNetwork}
           >
-            <Icon name="log-out" size={16} color={colors.error} />
-            <Text style={styles.disconnectButtonText}>Disconnect</Text>
+            <Icon name="swap-horizontal" size={16} color={colors.warning} />
+            <Text style={styles.networkButtonText}>Base Network</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.advancedToggle}
+          onPress={() => setShowAdvanced(!showAdvanced)}
+        >
+          <Text style={styles.advancedToggleText}>Advanced Features</Text>
+          <Icon 
+            name={showAdvanced ? "chevron-up" : "chevron-down"} 
+            size={16} 
+            color={colors.textSecondary} 
+          />
+        </TouchableOpacity>
+
+        {showAdvanced && (
+          <View style={styles.advancedSection}>
+            <View style={styles.signMessageSection}>
+              <Text style={styles.sectionTitle}>Sign Message</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter message to sign"
+                value={messageToSign}
+                onChangeText={setMessageToSign}
+                multiline
+              />
+              <TouchableOpacity
+                style={[styles.actionButton, styles.signButton]}
+                onPress={handleSignMessage}
+                disabled={!messageToSign.trim()}
+              >
+                <Icon name="create" size={16} color={colors.primary} />
+                <Text style={styles.signButtonText}>Sign Message</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.transactionSection}>
+              <Text style={styles.sectionTitle}>Send Transaction</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Recipient address (0x...)"
+                value={transactionTo}
+                onChangeText={setTransactionTo}
+              />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Amount in ETH"
+                value={transactionValue}
+                onChangeText={setTransactionValue}
+                keyboardType="numeric"
+              />
+              <TouchableOpacity
+                style={[styles.actionButton, styles.sendButton]}
+                onPress={handleSendTransaction}
+                disabled={!transactionTo.trim() || !transactionValue.trim()}
+              >
+                <Icon name="send" size={16} color={colors.success} />
+                <Text style={styles.sendButtonText}>Send Transaction</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={[styles.actionButton, styles.disconnectButton]}
+          onPress={handleDisconnectWallet}
+        >
+          <Icon name="log-out" size={16} color={colors.error} />
+          <Text style={styles.disconnectButtonText}>Disconnect Wallet</Text>
+        </TouchableOpacity>
 
         <View style={styles.securityNote}>
           <Icon name="shield-checkmark" size={16} color={colors.success} />
           <Text style={styles.securityText}>
-            Your wallet is securely connected. Tap the wallet card above for more options.
+            Your wallet is securely connected to the Base blockchain. All transactions are processed through your wallet app.
           </Text>
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>Connect Your Wallet</Text>
       <Text style={styles.subtitle}>
-        Choose a wallet to connect to the Base blockchain and start trading digital art.
+        Connect your crypto wallet to start trading digital art on the Base blockchain. Your wallet stays secure - we never store your private keys.
       </Text>
 
       {connectionError && (
@@ -216,22 +369,30 @@ export default function WalletConnection({ onWalletConnected }: WalletConnection
         ))}
       </View>
 
+      <View style={styles.networkInfo}>
+        <Icon name="information-circle" size={16} color={colors.primary} />
+        <Text style={styles.networkInfoText}>
+          This app works on the Base network. If your wallet is on a different network, you&apos;ll be prompted to switch.
+        </Text>
+      </View>
+
       <View style={styles.securityNote}>
         <Icon name="shield-checkmark" size={16} color={colors.success} />
         <Text style={styles.securityText}>
-          Your wallet connection is secure and encrypted. We never store your private keys.
+          Your wallet connection is secure and encrypted. We never store your private keys or have access to your funds.
         </Text>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     padding: spacing.lg,
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '700',
     color: colors.text,
     marginBottom: spacing.xs,
@@ -334,6 +495,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontFamily: 'monospace',
   },
+  ensName: {
+    fontSize: 12,
+    color: colors.primary,
+    marginTop: 2,
+  },
   walletBalance: {
     alignItems: 'flex-end',
   },
@@ -350,7 +516,7 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   actionButton: {
     flex: 1,
@@ -359,10 +525,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.md,
     borderRadius: borderRadius.md,
+    marginHorizontal: spacing.xs,
   },
   refreshButton: {
     backgroundColor: colors.primary + '20',
-    marginRight: spacing.sm,
   },
   refreshButtonText: {
     fontSize: 14,
@@ -370,15 +536,99 @@ const styles = StyleSheet.create({
     color: colors.primary,
     marginLeft: spacing.xs,
   },
+  networkButton: {
+    backgroundColor: colors.warning + '20',
+  },
+  networkButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.warning,
+    marginLeft: spacing.xs,
+  },
   disconnectButton: {
     backgroundColor: colors.error + '20',
-    marginLeft: spacing.sm,
+    marginTop: spacing.md,
   },
   disconnectButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.error,
     marginLeft: spacing.xs,
+  },
+  advancedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+  },
+  advancedToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  advancedSection: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  signMessageSection: {
+    marginBottom: spacing.lg,
+  },
+  transactionSection: {
+    marginBottom: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  textInput: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: 14,
+    color: colors.text,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  signButton: {
+    backgroundColor: colors.primary + '20',
+  },
+  signButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    marginLeft: spacing.xs,
+  },
+  sendButton: {
+    backgroundColor: colors.success + '20',
+  },
+  sendButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.success,
+    marginLeft: spacing.xs,
+  },
+  networkInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.primary + '10',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+  },
+  networkInfoText: {
+    fontSize: 12,
+    color: colors.primary,
+    marginLeft: spacing.sm,
+    flex: 1,
+    lineHeight: 16,
   },
   securityNote: {
     flexDirection: 'row',

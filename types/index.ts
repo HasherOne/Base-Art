@@ -101,6 +101,8 @@ export interface WalletInfo {
   provider: string;
   connected: boolean;
   connectedAt: string;
+  chainId: number;
+  ensName?: string;
 }
 
 export interface NotificationPreferences {
@@ -125,4 +127,27 @@ export interface WalletProvider {
   color: string;
   description: string;
   supported: boolean;
+}
+
+export interface WalletContextType {
+  walletInfo: WalletInfo | null;
+  isConnected: boolean;
+  isConnecting: boolean;
+  connectionError: string | null;
+  connectWallet: (providerId: string) => Promise<WalletInfo | null>;
+  disconnectWallet: () => Promise<void>;
+  refreshBalance: () => Promise<void>;
+  signMessage: (message: string) => Promise<string | null>;
+  sendTransaction: (to: string, value: string) => Promise<string | null>;
+}
+
+export interface EmailSubscriptionContextType {
+  email: string | null;
+  isSubscribed: boolean;
+  subscribe: (email: string) => Promise<void>;
+  unsubscribe: () => Promise<void>;
+  updatePreferences: (preferences: string[]) => Promise<void>;
+  preferences: string[];
+  isEmailValid: boolean;
+  validateEmail: (email: string) => void;
 }
