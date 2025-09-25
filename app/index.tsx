@@ -1,52 +1,55 @@
-import React, { useState } from 'react';
-import { Text, View, Image, TouchableOpacity } from 'react-native';
-import { commonStyles, colors } from '../styles/commonStyles';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import SimpleBottomSheet from '../components/BottomSheet';
 
+import React, { useState } from 'react';
+import { View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { commonStyles } from '../styles/commonStyles';
+import BottomTabBar from '../components/BottomTabBar';
+
+// Import screens
+import HomeScreen from '../screens/HomeScreen';
+import MarketplaceScreen from '../screens/MarketplaceScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import CreateScreen from '../screens/CreateScreen';
+
+const tabs = [
+  { key: 'home', title: 'Home', icon: 'home', activeIcon: 'home' },
+  { key: 'marketplace', title: 'Explore', icon: 'search', activeIcon: 'search' },
+  { key: 'create', title: 'Create', icon: 'add-circle-outline', activeIcon: 'add-circle' },
+  { key: 'profile', title: 'Profile', icon: 'person-outline', activeIcon: 'person' },
+];
 
 export default function MainScreen() {
-  const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState('home');
 
-  const handleOpenBottomSheet = () => {
-    setIsBottomSheetVisible(true);
+  console.log('MainScreen rendered with activeTab:', activeTab);
+
+  const renderActiveScreen = () => {
+    switch (activeTab) {
+      case 'home':
+        return <HomeScreen />;
+      case 'marketplace':
+        return <MarketplaceScreen />;
+      case 'create':
+        return <CreateScreen />;
+      case 'profile':
+        return <ProfileScreen />;
+      default:
+        return <HomeScreen />;
+    }
   };
 
   return (
-      <SafeAreaView style={commonStyles.container}>
-        <View style={commonStyles.content}>
-          <Image
-            source={require('../assets/images/final_quest_240x240.png')}
-            style={{ width: 180, height: 180 }}
-            resizeMode="contain"
-          />
-          <Text style={commonStyles.title}>This is a placeholder app.</Text>
-          <Text style={commonStyles.text}>Your app will be displayed here when it's ready.</Text>
-
-          <TouchableOpacity
-            style={{
-              backgroundColor: colors.primary,
-              paddingHorizontal: 24,
-              paddingVertical: 12,
-              borderRadius: 8,
-              marginTop: 30,
-            }}
-            onPress={handleOpenBottomSheet}
-          >
-            <Text style={{
-              color: colors.text,
-              fontSize: 16,
-              fontWeight: '600',
-            }}>
-              Open Bottom Sheet
-            </Text>
-          </TouchableOpacity>
+    <SafeAreaView style={commonStyles.safeArea}>
+      <View style={commonStyles.container}>
+        <View style={{ flex: 1 }}>
+          {renderActiveScreen()}
         </View>
-
-        <SimpleBottomSheet
-          isVisible={isBottomSheetVisible}
-          onClose={() => setIsBottomSheetVisible(false)}
+        <BottomTabBar
+          activeTab={activeTab}
+          onTabPress={setActiveTab}
+          tabs={tabs}
         />
-      </SafeAreaView>
+      </View>
+    </SafeAreaView>
   );
 }
